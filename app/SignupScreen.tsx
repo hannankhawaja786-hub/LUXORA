@@ -1,3 +1,4 @@
+import { useAuthStore } from '@/store/authStore';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -9,9 +10,9 @@ import {
   Text, TextInput, TouchableOpacity,
   View,
 } from 'react-native';
-
+ 
 const { width } = Dimensions.get('window');
-
+ 
 const BG       = '#0A0A0F';
 const GOLD     = '#C9A84C';
 const GOLD_LT  = '#F0C040';
@@ -20,7 +21,7 @@ const WHITE    = '#FFFFFF';
 const GREY     = '#55556A';
 const GOLD_DIM = '#C9A84C14';
 const ERROR    = '#CC4444';
-
+ 
 interface InputProps {
   label: string;
   value: string;
@@ -31,7 +32,7 @@ interface InputProps {
   delay?: number;
   hint?: string;
 }
-
+ 
 const LuxoraInput: React.FC<InputProps> = ({
   label, value, onChangeText, secure = false,
   keyboard = 'default', error, delay = 0, hint,
@@ -41,14 +42,14 @@ const LuxoraInput: React.FC<InputProps> = ({
   const borderAnim  = useRef(new Animated.Value(0)).current;
   const slideAnim   = useRef(new Animated.Value(20)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
-
+ 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(slideAnim,   { toValue: 0, duration: 600, delay, useNativeDriver: true }),
       Animated.timing(opacityAnim, { toValue: 1, duration: 600, delay, useNativeDriver: true }),
     ]).start();
   }, []);
-
+ 
   const onFocus = () => {
     setFocused(true);
     Animated.timing(borderAnim, { toValue: 1, duration: 300, useNativeDriver: false }).start();
@@ -57,12 +58,12 @@ const LuxoraInput: React.FC<InputProps> = ({
     setFocused(false);
     Animated.timing(borderAnim, { toValue: 0, duration: 300, useNativeDriver: false }).start();
   };
-
+ 
   const borderColor = borderAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [error ? ERROR : '#C9A84C22', error ? ERROR : GOLD],
   });
-
+ 
   return (
     <Animated.View style={[
       styles.inputWrap,
@@ -95,9 +96,9 @@ const LuxoraInput: React.FC<InputProps> = ({
     </Animated.View>
   );
 };
-
+ 
 export default function SignupScreen({ onDone, onLogin }: {
-  onDone: (user: { fullName: string; email: string; phone: string; password: string }) => void;
+  onDone: () => void;
   onLogin: () => void;
 }) {
   const [fullName,        setFullName]        = useState('');
@@ -108,12 +109,14 @@ export default function SignupScreen({ onDone, onLogin }: {
   const [errors,          setErrors]          = useState<Record<string, string>>({});
   const [agreed,          setAgreed]          = useState(false);
   const [submitted,       setSubmitted]       = useState(false);
-
+ 
+  const { signUp } = useAuthStore();
+ 
   const logoAnim    = useRef(new Animated.Value(0)).current;
   const contentAnim = useRef(new Animated.Value(40)).current;
   const fadeAnim    = useRef(new Animated.Value(0)).current;
   const checkAnim   = useRef(new Animated.Value(1)).current;
-
+ 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(logoAnim,    { toValue: 1, duration: 1000, useNativeDriver: true }),
@@ -121,7 +124,7 @@ export default function SignupScreen({ onDone, onLogin }: {
       Animated.timing(fadeAnim,    { toValue: 1, duration: 900, delay: 300, useNativeDriver: true }),
     ]).start();
   }, []);
-
+ 
   const validate = () => {
     const e: Record<string, string> = {};
     if (!fullName.trim())                             e.fullName = 'Full name is required';
@@ -133,14 +136,39 @@ export default function SignupScreen({ onDone, onLogin }: {
     setErrors(e);
     return Object.keys(e).length === 0;
   };
-
-  const handleSignup = () => {
+ 
+  const handleSignup = async () => {
     if (!validate()) return;
     setSubmitted(true);
-    // ✅ FIX: delay hataya — seedha call karo
-    onDone({ fullName, email, phone, password });
+ 
+    console.log('=== SIGNUP ATTEMPT ===');
+    console.log('Email:', email.trim());
+    console.log('Full Name:', fullName.trim());
+ 
+    try {
+      const result = await signUp({
+        email: email.trim(),
+        password,
+        full_name: fullName.trim(),
+      });
+ 
+      console.log('=== SIGNUP RESULT ===', JSON.stringify(result));
+ 
+      if (result.error) {
+        console.log('=== SIGNUP ERROR ===', result.error);
+        setErrors({ fullName: result.error });
+        setSubmitted(false);
+      } else {
+        console.log('=== SIGNUP SUCCESS ===');
+        onDone();
+      }
+    } catch (e: any) {
+      console.log('=== SIGNUP EXCEPTION ===', e?.message || e);
+      setErrors({ fullName: 'Unexpected error. Check logs.' });
+      setSubmitted(false);
+    }
   };
-
+ 
   const pulseCheck = () => {
     Animated.sequence([
       Animated.timing(checkAnim, { toValue: 0.85, duration: 100, useNativeDriver: true }),
@@ -148,18 +176,18 @@ export default function SignupScreen({ onDone, onLogin }: {
     ]).start();
     setAgreed(p => !p);
   };
-
+ 
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor={BG} />
-
+ 
       <View style={[styles.corner, styles.cornerTL]} />
       <View style={[styles.corner, styles.cornerTR]} />
       <View style={[styles.corner, styles.cornerBL]} />
       <View style={[styles.corner, styles.cornerBR]} />
       <View style={styles.vertLineLeft} />
       <View style={styles.vertLineRight} />
-
+ 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -179,7 +207,7 @@ export default function SignupScreen({ onDone, onLogin }: {
             <Text style={styles.brandSub}>EXCLUSIVE TRAVEL · SAUDI ARABIA</Text>
             <View style={styles.goldHRule} />
           </Animated.View>
-
+ 
           <Animated.View style={[
             styles.headBlock,
             { opacity: fadeAnim, transform: [{ translateY: contentAnim }] },
@@ -193,14 +221,14 @@ export default function SignupScreen({ onDone, onLogin }: {
               Premium membership · Exclusive perks · Global access
             </Text>
           </Animated.View>
-
+ 
           <View style={styles.form}>
             <LuxoraInput label="FULL NAME"        value={fullName}        onChangeText={setFullName}        error={errors.fullName} hint="e.g. Hannan Khawaja"  delay={100} />
             <LuxoraInput label="EMAIL ADDRESS"    value={email}           onChangeText={setEmail}           error={errors.email}    hint="your@email.com"       delay={200} keyboard="email-address" />
             <LuxoraInput label="PHONE NUMBER"     value={phone}           onChangeText={setPhone}           error={errors.phone}    hint="+92 3xx xxxxxxx"      delay={300} keyboard="phone-pad" />
             <LuxoraInput label="PASSWORD"         value={password}        onChangeText={setPassword}        error={errors.password} hint="Min 6 characters"     delay={400} secure />
             <LuxoraInput label="CONFIRM PASSWORD" value={confirmPassword} onChangeText={setConfirmPassword} error={errors.confirm}  hint="Re-enter password"    delay={500} secure />
-
+ 
             <Animated.View style={[
               styles.agreeRow,
               { opacity: fadeAnim },
@@ -225,7 +253,7 @@ export default function SignupScreen({ onDone, onLogin }: {
             {errors.agreed
               ? <Text style={[styles.errorText, { marginTop: -8, marginBottom: 12 }]}>◆ {errors.agreed}</Text>
               : null}
-
+ 
             <TouchableOpacity
               style={[styles.submitBtn, submitted ? styles.submitDone : {}]}
               onPress={handleSignup}
@@ -237,13 +265,13 @@ export default function SignupScreen({ onDone, onLogin }: {
                 </Text>
               </View>
             </TouchableOpacity>
-
+ 
             <View style={styles.divRow}>
               <View style={styles.divLine} />
               <Text style={styles.divDiamond}>◆</Text>
               <View style={styles.divLine} />
             </View>
-
+ 
             <View style={styles.socialRow}>
               <TouchableOpacity style={styles.socialBtn}>
                 <Text style={styles.socialText}>G  GOOGLE</Text>
@@ -252,7 +280,7 @@ export default function SignupScreen({ onDone, onLogin }: {
                 <Text style={styles.socialText}>in  LINKEDIN</Text>
               </TouchableOpacity>
             </View>
-
+ 
             <TouchableOpacity style={styles.loginLink} onPress={onLogin}>
               <Text style={styles.loginLinkText}>
                 Already a member?{' '}
@@ -260,19 +288,19 @@ export default function SignupScreen({ onDone, onLogin }: {
               </Text>
             </TouchableOpacity>
           </View>
-
+ 
           <View style={styles.footer}>
             <View style={styles.goldHRule} />
             <Text style={styles.footerBrand}>L · U · X · O · R · A</Text>
             <Text style={styles.footerSub}>© 2025 LUXORA · ALL RIGHTS RESERVED</Text>
           </View>
-
+ 
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
 }
-
+ 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   corner:   { position: 'absolute', width: 18, height: 18, zIndex: 10 },
@@ -327,3 +355,4 @@ const styles = StyleSheet.create({
   footerBrand: { fontSize: 9, letterSpacing: 8, color: GOLD, fontWeight: '200', opacity: 0.6 },
   footerSub:   { fontSize: 7, letterSpacing: 2, color: GREY, opacity: 0.5 },
 });
+ 
